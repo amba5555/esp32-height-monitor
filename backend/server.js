@@ -97,9 +97,10 @@ app.get('/', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Frontend available at: http://localhost:${PORT}`);
+    console.log(`Network access available at: http://192.168.5.107:${PORT}`);
     console.log(`API endpoints:`);
     console.log(`  POST /api/height - Receive height data from ESP32`);
     console.log(`  GET /api/height - Get recent height readings`);
