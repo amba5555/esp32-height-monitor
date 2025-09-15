@@ -4,9 +4,11 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Project Overview
 
-This is an ESP32 Height Monitor project that creates a complete IoT system for real-time height measurements using an ultrasonic sensor (HC-SR04). The system consists of three main components:
+This is an ESP32 Height Monitor project that creates a complete IoT system for real-time height measurements using an ultrasonic sensor (HC-SR04). The system is designed with a **standalone-first approach** where the ESP32 works independently with an OLED display, and web connectivity is secondary.
 
-1. **ESP32 Firmware** - Arduino C++ code that reads ultrasonic sensor data and sends it over WiFi
+The system consists of three main components:
+
+1. **ESP32 Firmware** - Arduino C++ code with OLED display that works independently, with optional WiFi connectivity
 2. **Node.js Backend** - Express.js API server that receives sensor data and serves the web interface
 3. **Frontend Web Interface** - Vanilla JavaScript/HTML/CSS dashboard for real-time monitoring
 
@@ -52,9 +54,13 @@ curl -X DELETE http://localhost:3000/api/height
 ### ESP32 Firmware Development
 ```bash
 # The ESP32 firmware must be uploaded using Arduino IDE
-# Key files: esp32-firmware/height_sensor.ino
+# Key files: 
+#   - esp32-firmware/height_sensor.ino (original web-dependent version)
+#   - esp32-firmware/height_sensor_simple.ino (standalone-first version)
 
 # Required libraries (install via Arduino Library Manager):
+# - Adafruit GFX Library
+# - Adafruit SSD1306 (for OLED display)
 # - ArduinoJson (for JSON serialization)
 # - WiFi (built-in ESP32 library)
 # - HTTPClient (built-in ESP32 library)
@@ -62,18 +68,24 @@ curl -X DELETE http://localhost:3000/api/height
 
 ## Architecture Overview
 
-### System Architecture
+### System Architecture (Standalone-First Design)
 ```
-ESP32 (Sensor) → WiFi → Node.js Backend → Web Dashboard
-     ↓                        ↓               ↓
-HC-SR04 Sensor          REST API Server   Real-time UI
+ESP32 (Standalone) ←→ OLED Display (Primary Interface)
+     ↓                        
+HC-SR04 Sensor               
+     ↓ (Optional)             
+WiFi → Node.js Backend → Web Dashboard (Secondary)
+            ↓                    ↓
+    REST API Server      Real-time Web UI
 ```
 
 ### Data Flow
 1. **ESP32** reads ultrasonic sensor every 1 second (configurable)
-2. **ESP32** sends JSON data via HTTP POST to backend API (`/api/height`)
-3. **Backend** stores readings in-memory (last 100 readings) and serves REST API
-4. **Frontend** polls backend every 2 seconds for current data and displays real-time updates
+2. **ESP32** stores readings locally and displays on OLED (primary operation)
+3. **ESP32** calculates statistics (min/max/average) locally and shows on display
+4. **ESP32** optionally sends JSON data via HTTP POST to backend API (`/api/height`) if WiFi is connected
+5. **Backend** stores readings in-memory (last 100 readings) and serves REST API
+6. **Frontend** polls backend every 2 seconds for current data and displays real-time updates
 
 ### Key Components
 
@@ -83,10 +95,14 @@ HC-SR04 Sensor          REST API Server   Real-time UI
 - **Static file serving** for frontend assets
 - **RESTful endpoints** for CRUD operations on height data
 
-#### ESP32 Firmware (`esp32-firmware/height_sensor.ino`)
-- **WiFi connectivity** with automatic connection handling
+#### ESP32 Firmware (`esp32-firmware/height_sensor_simple.ino`)
+- **Standalone operation** with OLED display as primary interface
+- **Local data storage** for 20 recent readings with statistics calculation
+- **Auto-cycling display** with 4 modes: Current, Statistics, History, Settings
+- **Single button control** with short press (mode change) and long press (reset)
+- **WiFi connectivity** as optional secondary feature
 - **Ultrasonic sensor interface** using HC-SR04 (Trigger: GPIO 5, Echo: GPIO 18)
-- **HTTP client** for JSON data transmission
+- **HTTP client** for JSON data transmission when WiFi is available
 - **Error handling** for invalid sensor readings (2-400cm range)
 
 #### Frontend Dashboard (`frontend/`)
@@ -97,21 +113,24 @@ HC-SR04 Sensor          REST API Server   Real-time UI
 
 ### Configuration Points
 
-#### ESP32 Configuration (height_sensor.ino)
+#### ESP32 Configuration (height_sensor_simple.ino)
 ```cpp
-// WiFi credentials - MUST be updated before upload
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
+// WiFi credentials - Automatically connects to open network
+const char* ssid = "drwsWIFI_2.4GHz";  // Open network, no password
+const char* password = "";              // Empty for open network
 
 // Server URL - Update with actual server IP
 const char* serverURL = "http://192.168.1.100:3000/api/height";
 
 // Hardware pins (GPIO numbers)
-#define TRIG_PIN 5    // Ultrasonic trigger pin
-#define ECHO_PIN 18   // Ultrasonic echo pin
+#define TRIG_PIN 5       // Ultrasonic trigger pin
+#define ECHO_PIN 18      // Ultrasonic echo pin
+#define POWER_BUTTON 19  // Single control button
 
-// Measurement interval
-const int MEASUREMENT_INTERVAL = 1000; // milliseconds
+// Display and timing settings
+const int MEASUREMENT_INTERVAL = 1000;   // milliseconds
+const int DISPLAY_CYCLE_TIME = 5000;     // Auto-cycle display every 5 seconds
+const int BUTTON_HOLD_TIME = 2000;       // Long press threshold
 ```
 
 #### Backend Configuration (server.js)
@@ -128,40 +147,61 @@ this.apiBase = '/api';                       // API base path
 
 ### Hardware Setup
 ```
+// Ultrasonic Sensor
 ESP32 Pin    →    HC-SR04 Pin
 GPIO 5       →    Trig
 GPIO 18      →    Echo
+5V           →    VCC (or 3.3V)
+GND          →    GND
+
+// OLED Display (I2C)
+ESP32 Pin    →    SSD1306 OLED
+GPIO 21      →    SDA
+GPIO 22      →    SCL
 3.3V         →    VCC
 GND          →    GND
+
+// Control Button
+ESP32 Pin    →    Push Button
+GPIO 19      →    One side of button
+GND          →    Other side of button
 ```
 
 ## Development Workflow
 
 ### Setting Up Development Environment
-1. **Backend**: Run `cd backend && npm install && npm run dev`
-2. **ESP32**: Configure WiFi credentials and server IP in `.ino` file
-3. **ESP32**: Upload firmware using Arduino IDE (ensure libraries are installed)
-4. **Testing**: Access web dashboard at `http://localhost:3000`
+1. **ESP32 Standalone**: Upload `height_sensor_simple.ino` using Arduino IDE (works without WiFi)
+2. **Backend** (Optional): Run `cd backend && npm install && npm run dev`
+3. **ESP32**: WiFi automatically connects to "drwsWIFI_2.4GHz" if available
+4. **Testing**: Device works immediately with OLED display, web dashboard at `http://localhost:3000` if connected
 
 ### Common Development Tasks
 
-#### Testing ESP32 Communication
+#### Testing ESP32 Standalone Operation
 ```bash
-# Monitor ESP32 serial output to debug connection issues
-# Check WiFi connection, HTTP responses, and sensor readings
+# Monitor ESP32 serial output via Arduino IDE Serial Monitor
+# Check sensor readings, OLED display updates, and button responses
+# WiFi connection status and IP address will be shown
 
-# Test API endpoints manually before ESP32 testing
+# Test API endpoints (if WiFi connected)
 curl http://localhost:3000/api/health
 ```
 
-#### Modifying Sensor Reading Frequency
-- **ESP32**: Change `MEASUREMENT_INTERVAL` in `.ino` file
-- **Frontend**: Modify `refreshIntervalMs` in `script.js`
+#### Button Controls
+- **Short Press** (< 2 seconds): Change display mode (Current → Stats → History → Settings)
+- **Long Press** (≥ 2 seconds): Reset all statistics and stored readings
+- **Auto-Cycle**: Display automatically cycles every 5 seconds if no manual interaction
 
-#### Adding New API Endpoints
-1. Add route handlers in `backend/server.js`
-2. Update frontend API calls in `frontend/script.js`
-3. Test with curl commands
+#### Display Modes
+1. **Current Reading**: Large height display with WiFi status and IP
+2. **Statistics**: Min/Max/Average heights and total readings
+3. **History**: Last 5 readings with timestamps
+4. **Settings**: WiFi status, network info, and control instructions
+
+#### Modifying Settings
+- **ESP32**: Change `MEASUREMENT_INTERVAL`, `DISPLAY_CYCLE_TIME` in `.ino` file
+- **Frontend**: Modify `refreshIntervalMs` in `script.js`
+- **WiFi**: Update `ssid` and `password` in ESP32 code
 
 ### Troubleshooting
 
@@ -180,7 +220,16 @@ curl http://localhost:3000/api/health
 
 ## File Structure Importance
 
+- `esp32-firmware/height_sensor_simple.ino` - **Primary ESP32 firmware** (standalone-first design)
+- `esp32-firmware/height_sensor.ino` - Original web-dependent ESP32 firmware
 - `backend/server.js` - Main API server logic and route definitions
-- `esp32-firmware/height_sensor.ino` - Complete ESP32 firmware implementation
 - `frontend/script.js` - Main frontend application class with all UI logic
 - `backend/package.json` - Node.js dependencies and npm scripts
+
+## Development Philosophy
+
+This project follows a **standalone-first approach**:
+1. **Primary Operation**: ESP32 works independently with OLED display
+2. **Secondary Feature**: Web connectivity enhances but doesn't replace local functionality
+3. **Resilient Design**: System continues operating even if WiFi/backend fails
+4. **User Experience**: Immediate feedback via OLED display, web dashboard as additional interface
