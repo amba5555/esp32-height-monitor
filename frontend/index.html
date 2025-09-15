@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Height Monitor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ESP32 Height Monitor</h1>
+            <p>Real-time ultrasonic height measurements</p>
+        </header>
+
+        <main>
+            <!-- Current Reading Display -->
+            <section class="current-reading">
+                <div class="reading-card">
+                    <div class="reading-value">
+                        <span id="currentHeight">--</span>
+                        <span class="unit">cm</span>
+                    </div>
+                    <div class="reading-info">
+                        <div class="status" id="connectionStatus">Disconnected</div>
+                        <div class="timestamp" id="lastUpdated">Last updated: Never</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Controls -->
+            <section class="controls">
+                <button id="refreshBtn" class="btn">Refresh</button>
+                <button id="clearBtn" class="btn btn-secondary">Clear History</button>
+                <button id="toggleAutoRefresh" class="btn btn-toggle" data-active="true">Auto Refresh: ON</button>
+            </section>
+
+            <!-- Statistics -->
+            <section class="statistics">
+                <div class="stat-card">
+                    <div class="stat-value" id="minHeight">--</div>
+                    <div class="stat-label">Min Height (cm)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="maxHeight">--</div>
+                    <div class="stat-label">Max Height (cm)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgHeight">--</div>
+                    <div class="stat-label">Avg Height (cm)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalReadings">0</div>
+                    <div class="stat-label">Total Readings</div>
+                </div>
+            </section>
+
+            <!-- Recent Readings -->
+            <section class="recent-readings">
+                <h2>Recent Readings</h2>
+                <div class="readings-container">
+                    <table id="readingsTable">
+                        <thead>
+                            <tr>
+                                <th>Height (cm)</th>
+                                <th>Time</th>
+                                <th>Sensor ID</th>
+                            </tr>
+                        </thead>
+                        <tbody id="readingsBody">
+                            <tr>
+                                <td colspan="3" class="no-data">No readings available</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>ESP32 Height Monitoring System | Status: <span id="serverStatus">Unknown</span></p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
